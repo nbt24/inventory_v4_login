@@ -2,12 +2,20 @@
 import React, { useState, useEffect } from "react";
 import "./App.css";
 
-
 // SheetBest API endpoint
 const SHEETBEST_URL = "https://api.sheetbest.com/sheets/f447a911-6ca1-4fa3-9743-d297133671a4";
-
-
 function App() {
+  // Login state
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
+
+  // Simple hardcoded credentials
+  const validUser = "admin";
+  const validPass = "password123";
+
+  // Inventory state
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState({
     productId: "",
@@ -22,7 +30,24 @@ function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Fetch products from SheetBest
+  // Login handler
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (username === validUser && password === validPass) {
+      setIsLoggedIn(true);
+      setLoginError("");
+    } else {
+      setLoginError("Invalid credentials");
+    }
+  };
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    setUsername("");
+    setPassword("");
+    setLoginError("");
+  };
+
+  // ...existing code for inventory management...
   const fetchProducts = async () => {
     setLoading(true);
     try {
@@ -44,16 +69,14 @@ function App() {
   };
 
   useEffect(() => {
-    fetchProducts();
-  }, []);
-
+    if (isLoggedIn) fetchProducts();
+  }, [isLoggedIn]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm({ ...form, [name]: value });
   };
 
-  // Add product to SheetBest
   const handleAddProduct = async () => {
     if (!form.productId || !form.productName) return;
     const newProduct = {
@@ -78,14 +101,13 @@ function App() {
         category: "",
         brand: "",
       });
-      await fetchProducts(); // Refetch after add
+      await fetchProducts();
     } catch (e) {
       alert("Failed to add product to SheetBest.");
     }
     setLoading(false);
   };
 
-  // Update quantity in SheetBest
   const updateQuantity = async (id, isAdding) => {
     const amount = parseInt(prompt(`Enter quantity to ${isAdding ? "add" : "remove"}:`));
     if (isNaN(amount) || amount <= 0) return;
@@ -103,13 +125,13 @@ function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedProduct),
       });
-      await fetchProducts(); // Refetch after update
+      await fetchProducts();
     } catch (e) {
       alert("Failed to update product in SheetBest.");
     }
     setLoading(false);
   };
-  // Download products as CSV
+
   const downloadCSV = () => {
     if (!products.length) return;
     const header = Object.keys(products[0]).join(",");
@@ -126,7 +148,6 @@ function App() {
     window.URL.revokeObjectURL(url);
   };
 
-
   const filteredProducts = products.filter(
     (p) => {
       const id = p.productId ? p.productId.toLowerCase() : "";
@@ -136,10 +157,40 @@ function App() {
     }
   );
 
+  // Render login form if not logged in
+  if (!isLoggedIn) {
+    return (
+      <div className="App" style={{ padding: "2rem", maxWidth: 400, margin: "auto" }}>
+        <h2>Login to Inventory Manager</h2>
+        <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <input
+            type="text"
+            placeholder="Username"
+            value={username}
+            onChange={e => setUsername(e.target.value)}
+            required
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            required
+          />
+          <button type="submit">Login</button>
+          {loginError && <div style={{ color: "red" }}>{loginError}</div>}
+        </form>
+      </div>
+    );
+  }
 
+  // ...existing code for inventory UI...
   return (
     <div className="App" style={{ padding: "2rem", maxWidth: 900, margin: "auto" }}>
-      <h2>🧾 Clothing Inventory Manager (Google Sheets Sync)</h2>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h2>🧾 Clothing Inventory Manager (Google Sheets Sync)</h2>
+        <button onClick={handleLogout}>Logout</button>
+      </div>
 
       <div style={{ marginBottom: 20 }}>
         <input
@@ -151,16 +202,7 @@ function App() {
       </div>
 
       <div style={{ display: "grid", gap: 10, marginBottom: 20 }}>
-        {[
-          "productId",
-          "productName",
-          "size",
-          "color",
-          "quantity",
-          "price",
-          "category",
-          "brand",
-        ].map((key) => (
+        {["productId", "productName", "size", "color", "quantity", "price", "category", "brand"].map((key) => (
           <input
             key={key}
             name={key}
@@ -183,18 +225,7 @@ function App() {
       <table border="1" cellPadding="6" style={{ width: "100%", marginTop: 20 }}>
         <thead>
           <tr>
-            {[
-              "Product ID",
-              "Name",
-              "Size",
-              "Color",
-              "Qty",
-              "Price",
-              "Category",
-              "Brand",
-              "Last Updated",
-              "Actions",
-            ].map((col) => (
+            {["Product ID", "Name", "Size", "Color", "Qty", "Price", "Category", "Brand", "Last Updated", "Actions"].map((col) => (
               <th key={col}>{col}</th>
             ))}
           </tr>
