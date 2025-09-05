@@ -37,12 +37,13 @@ function App() {
 
   // Access control: owners and regular users
   const ownerUsers = [
-    { username: "admin", password: "password123" },
-    { username: "owner2", password: "ownerpass" }
+    { username: "Rajivc123", password: "qwertyuiop" },
+    { username: "Anilc123", password: "1234567890" }
   ];
   const regularUsers = [
-    { username: "user1", password: "userpass1" },
-    { username: "user2", password: "userpass2" }
+    { username: "Rinkup123", password: "86692" },
+    { username: "Shivams123", password: "11223" },
+    { username: "Mithunh123", password: "80143" }
   ];
   // Track role
   const [userRole, setUserRole] = useState(""); // "owner" or "user"
@@ -379,7 +380,7 @@ function App() {
                       minWidth: 70,
                       marginBottom: 8
                     }}>
-                      <label style={{ fontSize: 14, fontWeight: 600, marginBottom: 4, color: theme.label }}>Size {size}</label>
+                      <label style={{ fontSize: 14, fontWeight: 600, marginBottom: 4, color: theme.label }}>{size}</label>
                       <input
                         type="number"
                         name={String(size)}
