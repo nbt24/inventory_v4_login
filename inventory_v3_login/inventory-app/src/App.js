@@ -49,7 +49,7 @@ function App() {
 
   // Inventory state
   const [products, setProducts] = useState([]);
-  const sizeOptions = [32, 34,36,38,40,42,44,46];
+  const sizeOptions = ["32", "34", "S/36", "M/38", "L/40", "XL/42", "XXL/44", "3XL/46", "Free"];
   const [form, setForm] = useState({
     productId: "",
     productName: "",
@@ -278,12 +278,12 @@ function App() {
             <button type="submit" style={{ background: theme.buttonBg, color: theme.buttonText, border: "none", borderRadius: 6, padding: "12px 0", fontWeight: 600, fontSize: 17, cursor: "pointer", marginTop: 8, boxShadow: "0 2px 8px rgba(0,82,204,0.08)" }}>
               Login
             </button>
-            <div style={{ fontSize: 13, color: theme.label, marginTop: 8 }}>
+            {/* <div style={{ fontSize: 13, color: theme.label, marginTop: 8 }}>
               <b>Owner:</b> admin/password123<br />
               <b>Owner:</b> owner2/ownerpass<br />
               <b>User:</b> user1/userpass1<br />
               <b>User:</b> user2/userpass2
-            </div>
+            </div> */}
             {loginError && <div style={{ color: "#d32f2f", fontWeight: 500, marginTop: 8 }}>{loginError}</div>}
           </form>
           <button onClick={() => setDarkMode(!darkMode)} style={{ marginTop: 18, background: theme.buttonBg, color: theme.buttonText, border: "none", borderRadius: 6, padding: "8px 0", fontWeight: 600, fontSize: 15, cursor: "pointer", width: "100%", boxShadow: darkMode ? "0 4px 16px 0 #ffe06655, 0 2px 0 #bfae4a" : "0 4px 16px 0 #0052cc33, 0 2px 0 #0052cc55" }}>
