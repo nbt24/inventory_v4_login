@@ -6,8 +6,8 @@ import companyLogo from "./company-logo.png";
 const colorOptions = [
   "White", "Black", "Red", "Blue", "Green", "Yellow", "Orange", "Purple", "Pink", "Brown", "Gray", "Violet", "Indigo", "Cyan", "Magenta", "Lime", "Olive", "Teal", "Navy", "Maroon", "Silver", "Gold", "Beige", "Coral", "Turquoise", "Tan", "Salmon", "Khaki", "Lavender", "Plum", "Orchid", "Ivory", "Mint", "Peach", "Chocolate", "Crimson", "Azure", "Aqua", "Fuchsia", "SlateGray", "SkyBlue", "Tomato", "Sienna", "Moccasin", "Peru", "Wheat", "SeaGreen", "ForestGreen", "RoyalBlue", "SteelBlue", "DeepPink", "HotPink", "LightBlue", "LightGreen", "LightGray", "DarkBlue", "DarkGreen", "DarkRed", "DarkOrange", "DarkViolet", "DarkMagenta", "DarkCyan", "DarkSlateGray", "MediumVioletRed", "MediumSeaGreen", "MediumSlateBlue", "MediumPurple", "MediumOrchid", "MediumTurquoise", "MediumSpringGreen", "MediumAquamarine", "MediumBlue", "MediumSeaGreen", "MediumSlateBlue", "MediumTurquoise", "MediumVioletRed", "PaleGreen", "PaleTurquoise", "PaleVioletRed", "PaleGoldenRod", "LightSalmon", "LightCoral", "LightCyan", "LightGoldenRodYellow", "LightPink", "LightSeaGreen", "LightSkyBlue", "LightSlateGray", "LightSteelBlue", "LawnGreen", "LemonChiffon", "MistyRose", "NavajoWhite", "OldLace", "PapayaWhip", "PowderBlue", "RosyBrown", "SandyBrown", "Thistle", "YellowGreen"
 ];
-// SheetBest API endpoint
-const SHEETBEST_URL = "https://api.sheetbest.com/sheets/f447a911-6ca1-4fa3-9743-d297133671a4";
+// Firebase Realtime Database endpoint
+const FIREBASE_URL = "https://anil-inventory-default-rtdb.asia-southeast1.firebasedatabase.app/inventory";
 function App() {
   // Dark mode state
   const [darkMode, setDarkMode] = useState(false);
@@ -96,11 +96,13 @@ function App() {
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      const res = await fetch(SHEETBEST_URL);
+      const res = await fetch(`${FIREBASE_URL}.json`);
       const data = await res.json();
-      if (Array.isArray(data)) {
-        const items = data.map((row) => ({
+      // Firebase returns an object { key: product, ... }; convert to array
+      if (data && typeof data === "object") {
+        const items = Object.entries(data).map(([key, row]) => ({
           ...row,
+          key, // Store Firebase key for delete/update operations
           quantity: parseInt(row.quantity) || 0,
         }));
         setProducts(items);
@@ -108,7 +110,7 @@ function App() {
         setProducts([]);
       }
     } catch (e) {
-      alert("Failed to fetch products from SheetBest.");
+      alert("Failed to fetch products from Firebase.");
     }
     setLoading(false);
   };
@@ -123,16 +125,17 @@ function App() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    if (sizeOptions.includes(Number(name))) {
-      setForm({
-        ...form,
+    // If the input name matches one of the sizeOptions, update quantities
+    if (sizeOptions.includes(name)) {
+      setForm((prev) => ({
+        ...prev,
         quantities: {
-          ...form.quantities,
+          ...prev.quantities,
           [name]: value
         }
-      });
+      }));
     } else {
-      setForm({ ...form, [name]: value });
+      setForm((prev) => ({ ...prev, [name]: value }));
     }
   };
 
@@ -153,12 +156,19 @@ function App() {
           remarks: form.remarks,
           lastUpdated: new Date().toISOString(),
         }));
+      // POST each product to Firebase (Firebase generates unique keys)
       for (const prod of productsToAdd) {
-        await fetch(SHEETBEST_URL, {
+        const res = await fetch(`${FIREBASE_URL}.json`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(prod),
         });
+        if (!res.ok) {
+          const body = await res.text().catch(() => "");
+          alert(`Failed to add product: ${res.status} ${res.statusText} \n${body}`);
+          setLoading(false);
+          return;
+        }
       }
       setForm({
         productId: "",
@@ -171,9 +181,11 @@ function App() {
           return acc;
         }, {})
       });
+      // Wait briefly for Firebase to settle, then refresh.
+      await new Promise((resolve) => setTimeout(resolve, 500));
       await fetchProducts();
     } catch (e) {
-      alert("Failed to add product to SheetBest.");
+      alert("Failed to add product to Firebase.");
     }
     setLoading(false);
   };
@@ -190,24 +202,39 @@ function App() {
     }
     setLoading(true);
     try {
+      const firebaseKey = products[idx].key; // Get Firebase key for deletion
       const updatedProduct = {
         ...products[idx],
         quantity: isAdding ? currentQty + amount : currentQty - amount,
         lastUpdated: new Date().toISOString(),
       };
-      // Delete the old row
-      await fetch(`${SHEETBEST_URL}/productId/${id}`, {
+      delete updatedProduct.key; // Remove key before sending to Firebase
+      // Delete the old record by Firebase key
+      const delRes = await fetch(`${FIREBASE_URL}/${firebaseKey}.json`, {
         method: "DELETE",
       });
-      // Add the new row
-      await fetch(SHEETBEST_URL, {
+      if (!delRes.ok) {
+        const body = await delRes.text().catch(() => "");
+        alert(`Failed to delete product: ${delRes.status} ${delRes.statusText} \n${body}`);
+        setLoading(false);
+        return;
+      }
+      // Add the updated record
+      const postRes = await fetch(`${FIREBASE_URL}.json`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedProduct),
       });
-      setTimeout(fetchProducts, 500);
+      if (!postRes.ok) {
+        const body = await postRes.text().catch(() => "");
+        alert(`Failed to add updated product: ${postRes.status} ${postRes.statusText} \n${body}`);
+        setLoading(false);
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await fetchProducts();
     } catch (e) {
-      alert("Failed to update product in SheetBest.");
+      alert("Failed to update product in Firebase.");
     }
     setLoading(false);
   };
