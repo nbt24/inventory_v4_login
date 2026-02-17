@@ -219,7 +219,14 @@ function App() {
         setLoading(false);
         return;
       }
-      // Add the updated record
+      // If updated quantity is zero, don't re-add — item is removed
+      if (updatedProduct.quantity === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        await fetchProducts();
+        setLoading(false);
+        return;
+      }
+      // Add the updated record (quantity > 0)
       const postRes = await fetch(`${FIREBASE_URL}.json`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
