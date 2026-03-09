@@ -140,20 +140,60 @@ function App() {
   };
 
   const handleAddProduct = async () => {
-    if (!form.productId || !form.productName || !form.color) return;
+    // Validate Product ID format
+    const trimmedId = form.productId.trim();
+    if (!trimmedId) {
+      alert("Product ID cannot be empty");
+      return;
+    }
+    if (!/^[A-Z0-9_-]+$/i.test(trimmedId)) {
+      alert("Product ID can only contain letters (A-Z), numbers (0-9), hyphens (-), and underscores (_)");
+      return;
+    }
+    if (trimmedId.length > 50) {
+      alert("Product ID must be 50 characters or less");
+      return;
+    }
+
+    // Validate Product Name
+    const trimmedName = form.productName.trim();
+    if (!trimmedName) {
+      alert("Product Name cannot be empty");
+      return;
+    }
+    if (trimmedName.length > 100) {
+      alert("Product Name must be 100 characters or less");
+      return;
+    }
+
+    // Validate Color
+    if (!form.color || !form.color.trim()) {
+      alert("Color is required");
+      return;
+    }
+
+    // Validate at least one size has quantity
+    const hasQuantity = Object.values(form.quantities).some(
+      q => q !== "" && parseInt(q) > 0
+    );
+    if (!hasQuantity) {
+      alert("Please enter quantity for at least one size");
+      return;
+    }
+
     setLoading(true);
     try {
       const productsToAdd = sizeOptions
         .filter(size => form.quantities[size] && parseInt(form.quantities[size]) > 0)
         .map((size, idx) => ({
           // Unique productId: baseId_color_size
-          productId: `${form.productId}_${form.color}_${size}`,
-          productName: form.productName,
+          productId: `${trimmedId}_${form.color}_${size}`,
+          productName: trimmedName,
           size: size,
           color: form.color,
           quantity: parseInt(form.quantities[size]),
-          category: form.category,
-          remarks: form.remarks,
+          category: form.category.trim(),
+          remarks: form.remarks.trim(),
           lastUpdated: new Date().toISOString(),
         }));
       // POST each product to Firebase (Firebase generates unique keys)
@@ -170,6 +210,7 @@ function App() {
           return;
         }
       }
+      alert("Product added successfully!");
       setForm({
         productId: "",
         productName: "",
@@ -202,42 +243,43 @@ function App() {
     }
     setLoading(true);
     try {
-      const firebaseKey = products[idx].key; // Get Firebase key for deletion
+      const firebaseKey = products[idx].key;
+      const newQuantity = isAdding ? currentQty + amount : currentQty - amount;
+      
       const updatedProduct = {
         ...products[idx],
-        quantity: isAdding ? currentQty + amount : currentQty - amount,
+        quantity: newQuantity,
         lastUpdated: new Date().toISOString(),
       };
       delete updatedProduct.key; // Remove key before sending to Firebase
-      // Delete the old record by Firebase key
-      const delRes = await fetch(`${FIREBASE_URL}/${firebaseKey}.json`, {
-        method: "DELETE",
-      });
-      if (!delRes.ok) {
-        const body = await delRes.text().catch(() => "");
-        alert(`Failed to delete product: ${delRes.status} ${delRes.statusText} \n${body}`);
-        setLoading(false);
-        return;
+      
+      // If quantity is zero, delete the item
+      if (newQuantity === 0) {
+        const delRes = await fetch(`${FIREBASE_URL}/${firebaseKey}.json`, {
+          method: "DELETE",
+        });
+        if (!delRes.ok) {
+          const body = await delRes.text().catch(() => "");
+          alert(`Failed to delete product: ${delRes.status} ${delRes.statusText} \n${body}`);
+          setLoading(false);
+          return;
+        }
+      } else {
+        // Use PUT to update at the same Firebase key (atomic operation)
+        // This prevents data loss - entire update succeeds or fails as one unit
+        const putRes = await fetch(`${FIREBASE_URL}/${firebaseKey}.json`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatedProduct),
+        });
+        if (!putRes.ok) {
+          const body = await putRes.text().catch(() => "");
+          alert(`Failed to update product: ${putRes.status} ${putRes.statusText} \n${body}`);
+          setLoading(false);
+          return;
+        }
       }
-      // If updated quantity is zero, don't re-add — item is removed
-      if (updatedProduct.quantity === 0) {
-        await new Promise((resolve) => setTimeout(resolve, 300));
-        await fetchProducts();
-        setLoading(false);
-        return;
-      }
-      // Add the updated record (quantity > 0)
-      const postRes = await fetch(`${FIREBASE_URL}.json`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updatedProduct),
-      });
-      if (!postRes.ok) {
-        const body = await postRes.text().catch(() => "");
-        alert(`Failed to add updated product: ${postRes.status} ${postRes.statusText} \n${body}`);
-        setLoading(false);
-        return;
-      }
+      
       await new Promise((resolve) => setTimeout(resolve, 500));
       await fetchProducts();
     } catch (e) {
@@ -489,7 +531,7 @@ function App() {
             </thead>
             <tbody>
               {filteredProducts.map((p) => (
-                <tr key={p.productId + '-' + p.size + '-' + p.color} style={{ borderBottom: `1px solid ${theme.tableBorder}` }}>
+                <tr key={p.key} style={{ borderBottom: `1px solid ${theme.tableBorder}` }}>
                   <td style={{ padding: "8px 6px" }}>{p.productId}</td>
                   <td style={{ padding: "8px 6px" }}>{p.productName}</td>
                   <td style={{ padding: "8px 6px" }}>{p.size}</td>
